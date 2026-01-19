@@ -1,0 +1,117 @@
+version: "3.9"
+
+services:
+  # ----------- Storage (time-series in Postgres/Timescale) -----------
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    container_name: ds_postgres
+    environment:
+      POSTGRES_DB: electricity
+      POSTGRES_USER: electricity
+      POSTGRES_PASSWORD: electricity
+    ports:
+      - "55432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U electricity -d electricity"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ----------- Ingestion service (your code) -----------
+  ingest:
+    build:
+      context: ./services/ingest
+      dockerfile: Dockerfile
+    container_name: ds_ingest
+    environment:
+      # DB
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: electricity
+      DB_USER: electricity
+      DB_PASSWORD: electricity
+
+      # Ingestion config
+      INGEST_INTERVAL_SECONDS: "300"   # every 5 minutes
+      SOURCE_NAME: "electricity_api"
+
+      # Example: if you use an external API token
+      # API_TOKEN: "${API_TOKEN}"
+
+      # Metrics
+      METRICS_PORT: "8000"
+      LOG_LEVEL: "INFO"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8002:8000" # Prometheus metrics endpoint (host:container)
+    restart: unless-stopped
+    labels:
+      logging: "promtail"
+
+  # ----------- Metrics: Prometheus -----------
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ds_prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    ports:
+      - "9095:9090"
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - promdata:/prometheus
+    depends_on:
+      - ingest
+
+  # ----------- Logs: Loki -----------
+  loki:
+    image: grafana/loki:2.9.8
+    container_name: ds_loki
+    command: ["-config.file=/etc/loki/config.yml"]
+    ports:
+      - "3105:3100"
+    volumes:
+      - ./observability/loki/config.yml:/etc/loki/config.yml:ro
+      - lokidata:/loki
+
+  # ----------- Logs shipper: Promtail (reads docker logs) -----------
+  promtail:
+    image: grafana/promtail:2.9.8
+    container_name: ds_promtail
+    command: ["-config.file=/etc/promtail/config.yml"]
+    volumes:
+      - ./observability/promtail/config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    depends_on:
+      - loki
+
+  # ----------- Grafana (dashboards + “show data”) -----------
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ds_grafana
+    ports:
+      - "3005:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafanadata:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+      - postgres
+      - loki
+
+volumes:
+  pgdata:
+  promdata:
+  lokidata:
+  grafanadata:
