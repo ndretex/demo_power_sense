@@ -1,21 +1,21 @@
 version: "3.9"
 
 services:
-  # ----------- Storage (time-series in Postgres/Timescale) -----------
-  postgres:
-    image: timescale/timescaledb:latest-pg16
-    container_name: ds_postgres
+  # ----------- Storage (ClickHouse) -----------
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.12
+    container_name: ds_clickhouse
     environment:
-      POSTGRES_DB: electricity
-      POSTGRES_USER: electricity
-      POSTGRES_PASSWORD: electricity
+      CLICKHOUSE_DB: electricity
+      CLICKHOUSE_USER: electricity
+      CLICKHOUSE_PASSWORD: electricity
     ports:
-      - "55432:5432"
+      - "58123:8123"
     volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./db/init:/docker-entrypoint-initdb.d
+      - chdata:/var/lib/clickhouse
+      - ./ch/init:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U electricity -d electricity"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8123/ping | grep -q Ok"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -28,8 +28,8 @@ services:
     container_name: ds_ingest
     environment:
       # DB
-      DB_HOST: postgres
-      DB_PORT: "5432"
+      DB_HOST: clickhouse
+      DB_PORT: "8123"
       DB_NAME: electricity
       DB_USER: electricity
       DB_PASSWORD: electricity
@@ -45,7 +45,7 @@ services:
       METRICS_PORT: "8000"
       LOG_LEVEL: "INFO"
     depends_on:
-      postgres:
+      clickhouse:
         condition: service_healthy
     ports:
       - "8002:8000" # Prometheus metrics endpoint (host:container)
@@ -101,17 +101,18 @@ services:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_INSTALL_PLUGINS: grafana-clickhouse-datasource
     volumes:
       - grafanadata:/var/lib/grafana
       - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       - prometheus
-      - postgres
+      - clickhouse
       - loki
 
 volumes:
-  pgdata:
+  chdata:
   promdata:
   lokidata:
   grafanadata:

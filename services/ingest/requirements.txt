@@ -1,5 +1,5 @@
 requests
-psycopg2-binary
+clickhouse-connect
 prometheus-client
 python-dateutil
 pandas

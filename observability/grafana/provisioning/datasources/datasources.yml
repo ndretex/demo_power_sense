@@ -7,18 +7,17 @@ datasources:
     url: http://prometheus:9090
     isDefault: true
 
-  - name: Postgres
-    type: postgres
+  - name: ClickHouse
+    type: grafana-clickhouse-datasource
     access: proxy
-    url: postgres:5432
-    user: electricity
+    url: http://clickhouse:8123
+    uid: clickhouse
+    jsonData:
+      defaultDatabase: electricity
+      protocol: http
+      username: electricity
     secureJsonData:
       password: electricity
-    jsonData:
-      database: electricity
-      sslmode: disable
-      postgresVersion: 1600
-      timescaledb: true
 
   - name: Loki
     type: loki

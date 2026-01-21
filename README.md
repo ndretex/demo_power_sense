@@ -16,16 +16,18 @@ Current phase (Phase 1):
 ## Features
 
 - Scheduled electricity data ingestion.
-- Time‑series storage in TimescaleDB (Postgres).
+- Time‑series storage in ClickHouse.
 - Prometheus metrics for ingestion health.
 - Centralized logging with Loki + Promtail.
 - Grafana exploration across metrics, logs, and time‑series data.
 - NaN/NA/NaT values are sanitized to SQL NULL during ingestion inserts.
 - Each measurement row stores insertion time in `inserted_at` (defaults to current time).
+- Each measurement row includes a `ukey` JSON string and a `version` hash to keep distinct values while collapsing duplicates.
+- A materialized view (`measurements_latest`) keeps the latest inserted version per `ukey`.
 
 ## Services (Docker Compose)
 
-- **postgres**: TimescaleDB backing store.
+- **clickhouse**: ClickHouse backing store.
 - **ingest**: Python ingestion service exposing Prometheus metrics on port 8000.
 - **prometheus**: Scrapes ingest metrics.
 - **loki** + **promtail**: Collect and index logs.
@@ -33,8 +35,10 @@ Current phase (Phase 1):
 
 ## Repository Structure
 
-- docker_compose.yml
-- db/init/001_init.sql
+- docker-compose.yml
+- ch/init/001.database.sql
+- ch/init/002.tables.sql
+- ch/init/003.views.sql
 - observability/
   - grafana/provisioning/datasources/datasources.yml
   - prometheus/prometheus.yml

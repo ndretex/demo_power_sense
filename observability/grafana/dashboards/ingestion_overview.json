@@ -23,8 +23,8 @@
   "panels": [
     {
       "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "P44368ADAD746BC27"
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
       },
       "fieldConfig": {
         "defaults": {
@@ -103,12 +103,12 @@
         {
           "dataset": "electricity",
           "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "P44368ADAD746BC27"
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
           },
           "editorMode": "builder",
           "format": "table",
-          "rawSql": "SELECT inserted_at, COUNT(value) AS \"n inserted rows\" FROM measurements WHERE $__timeFilter(inserted_at) GROUP BY inserted_at ORDER BY inserted_at ",
+          "rawSql": "SELECT inserted_at, COUNT() AS \"n inserted rows\" FROM measurements WHERE $__timeFilter(inserted_at) GROUP BY inserted_at ORDER BY inserted_at",
           "refId": "A",
           "sql": {
             "columns": [
@@ -187,8 +187,8 @@
     },
     {
       "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "P44368ADAD746BC27"
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
       },
       "fieldConfig": {
         "defaults": {
@@ -271,13 +271,13 @@
         {
           "dataset": "electricity",
           "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "P44368ADAD746BC27"
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
           },
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT ts,\nmax(case when metric='consommation' then value end) as consommation,\nmax(case when metric='prevision_j' then value end) as prevision_j,\nmax(case when metric='prevision_j1' then value end) as prevision_j1\nFROM measurements \nwhere value is not null\ngroup by ts\norder by ts desc\nLIMIT 1000",
+          "rawSql": "SELECT ts,\nmaxIf(value, metric = 'consommation') AS consommation,\nmaxIf(value, metric = 'prevision_j') AS prevision_j,\nmaxIf(value, metric = 'prevision_j1') AS prevision_j1\nFROM measurements\nWHERE value IS NOT NULL\nGROUP BY ts\nORDER BY ts DESC\nLIMIT 1000",
           "refId": "A",
           "sql": {
             "columns": [

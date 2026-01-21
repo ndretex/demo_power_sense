@@ -4,6 +4,7 @@ from dateutil import parser as date_parser
 
 from .config import DEFAULT_SOURCE
 
+
 def remap_metric_name(original_name: str) -> str:
     """
     Remap original metric names to standardized ones.
@@ -81,25 +82,24 @@ def remap_metric_name(original_name: str) -> str:
     norm_key = norm_key.strip("_")
     return norm_key or original_name
 
-            
-            
+
 def normalize_record(rec: Dict[str, Any]) -> List[Tuple]:
     """
     Convert one API result object into a list of measurement rows.
 
     Each numeric field (except metadata fields) becomes its own row:
-      (ts, source, metric, value, meta)
+    (ts, source, metric, value)
 
-    We skip null values because the DB `value` column is NOT NULL.
+    We skip null values to avoid inserting empty metrics.
     """
     ts = rec.get("date_heure")
-    
+
     # If `date_heure` not present, attempt to infer from available fields
     if not ts:
         # look for values that look like YYYY-MM-DD and HH:MM
         date_val = None
         heure_val = None
-        for k, v in rec.items():
+        for _, v in rec.items():
             if v is None:
                 continue
             try:
@@ -111,7 +111,13 @@ def normalize_record(rec: Dict[str, Any]) -> List[Tuple]:
                 # matches 2025-01-01 etc.
                 date_val = s
             # time detection HH:MM
-            if heure_val is None and len(s) >= 4 and s[0:2].isdigit() and s[2] == ':' and s[3:5].isdigit():
+            if (
+                heure_val is None
+                and len(s) >= 4
+                and s[0:2].isdigit()
+                and s[2] == ":"
+                and s[3:5].isdigit()
+            ):
                 heure_val = s
             if date_val and heure_val:
                 break
@@ -125,14 +131,17 @@ def normalize_record(rec: Dict[str, Any]) -> List[Tuple]:
         return []
 
     source = rec.get("perimetre", DEFAULT_SOURCE)
+    nature = rec.get("nature")
 
-    meta = {
-        "date": rec.get("date"),
-        "heure": rec.get("heure"),
-        "nature": rec.get("nature"),
+    skip_keys = {
+        "perimetre",
+        "nature",
+        "date",
+        "heure",
+        "date_heure",
+        "total_count",
+        "results",
     }
-
-    skip_keys = {"perimetre", "nature", "date", "heure", "date_heure", "total_count", "results"}
     rows: List[Tuple] = []
     for k, v in rec.items():
         if k in skip_keys:
@@ -145,7 +154,6 @@ def normalize_record(rec: Dict[str, Any]) -> List[Tuple]:
             continue
 
         metric = k
-        meta_for_metric = dict(meta)
-        rows.append((ts_dt, source, metric, val, meta_for_metric))
+    rows.append((ts_dt, source, metric, val, source, nature))
 
     return rows

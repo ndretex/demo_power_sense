@@ -6,11 +6,11 @@ def get_env(name: str, default: Optional[str] = None) -> Optional[str]:
     return os.getenv(name, default)
 
 
-DB_HOST = get_env("DB_HOST", "postgres")
-DB_PORT = int(get_env("DB_PORT", "5432"))
-DB_NAME = get_env("DB_NAME", "postgres")
-DB_USER = get_env("DB_USER", "postgres")
-DB_PASSWORD = get_env("DB_PASSWORD", "postgres")
+DB_HOST = get_env("DB_HOST", "clickhouse")
+DB_PORT = int(get_env("DB_PORT", "8123"))
+DB_NAME = get_env("DB_NAME", "electricity")
+DB_USER = get_env("DB_USER", "electricity")
+DB_PASSWORD = get_env("DB_PASSWORD", "electricity")
 
 API_URL = get_env(
     "API_URL",
