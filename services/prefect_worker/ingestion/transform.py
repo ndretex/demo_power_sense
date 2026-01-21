@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Tuple
 
 from dateutil import parser as date_parser
 
-from .config import DEFAULT_SOURCE
+from config import DEFAULT_SOURCE
 
 
 def remap_metric_name(original_name: str) -> str:
@@ -82,7 +82,6 @@ def remap_metric_name(original_name: str) -> str:
     norm_key = norm_key.strip("_")
     return norm_key or original_name
 
-
 def normalize_record(rec: Dict[str, Any]) -> List[Tuple]:
     """
     Convert one API result object into a list of measurement rows.
@@ -154,6 +153,6 @@ def normalize_record(rec: Dict[str, Any]) -> List[Tuple]:
             continue
 
         metric = k
-    rows.append((ts_dt, source, metric, val, source, nature))
+        rows.append((ts_dt, source, metric, val, source, nature))
 
     return rows

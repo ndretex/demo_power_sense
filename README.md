@@ -17,19 +17,20 @@ Current phase (Phase 1):
 
 - Scheduled electricity data ingestion.
 - Time‑series storage in ClickHouse.
-- Prometheus metrics for ingestion health.
+- (Metrics disabled) Prometheus is kept for future phases.
 - Centralized logging with Loki + Promtail.
 - Grafana exploration across metrics, logs, and time‑series data.
 - NaN/NA/NaT values are sanitized to SQL NULL during ingestion inserts.
 - Each measurement row stores insertion time in `inserted_at` (defaults to current time).
-- Each measurement row includes a `ukey` JSON string and a `version` hash to keep distinct values while collapsing duplicates.
-- A materialized view (`measurements_latest`) keeps the latest inserted version per `ukey`.
+- Each measurement row includes a `ukey` JSON string and a sequential `version` that increments when the value for a `ukey` changes (1, 2, 3...).
+- The `measurements` table deduplicates on (`ukey`, `version`) and keeps the latest `inserted_at` during merges.
+- A materialized view (`measurements_latest`) keeps the latest inserted row per `ukey`.
 
 ## Services (Docker Compose)
 
 - **clickhouse**: ClickHouse backing store.
-- **ingest**: Python ingestion service exposing Prometheus metrics on port 8000.
-- **prometheus**: Scrapes ingest metrics.
+- **prefect_worker**: Prefect worker running project flows (ingest now, future phases later).
+- **prometheus**: Reserved for future metrics.
 - **loki** + **promtail**: Collect and index logs.
 - **grafana**: Dashboards and data exploration.
 
@@ -44,17 +45,18 @@ Current phase (Phase 1):
   - prometheus/prometheus.yml
   - loki/config.yml
   - promtail/config.yml
-- services/ingest/
+- services/prefect_worker/
   - Dockerfile
   - requirements.txt
-  - app/
-    - main.py
-    - config.py
-    - ingest.py
-    - db.py
-    - metrics.py
-    - logging.py
+  - main.py
+  - config.py
+  - db.py
+  - logging_config.py
+  - ingestion/
+    - flow.py
+    - tasks.py
+    - transform.py
 
 ## Service Documentation
 
-- See the ingestion service details in services/ingest/README.md.
+- See the Prefect worker details in services/prefect_worker/README.md.

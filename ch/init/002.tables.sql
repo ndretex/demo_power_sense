@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS electricity.measurements (
   version     UInt64,
   inserted_at DateTime64(3, 'UTC') DEFAULT now64(3)
 )
-ENGINE = ReplacingMergeTree(version)
+ENGINE = ReplacingMergeTree(inserted_at)
 PARTITION BY toYYYYMM(ts)
 ORDER BY (ukey, version);
 

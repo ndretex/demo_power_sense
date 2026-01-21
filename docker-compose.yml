@@ -1,10 +1,8 @@
-version: "3.9"
-
 services:
   # ----------- Storage (ClickHouse) -----------
   clickhouse:
-    image: clickhouse/clickhouse-server:25.12
-    container_name: ds_clickhouse
+    image: clickhouse/clickhouse-server:latest
+    container_name: dps_clickhouse
     environment:
       CLICKHOUSE_DB: electricity
       CLICKHOUSE_USER: electricity
@@ -20,12 +18,12 @@ services:
       timeout: 5s
       retries: 10
 
-  # ----------- Ingestion service (your code) -----------
-  ingest:
+  # ----------- Prefect worker (runs project flows) -----------
+  prefect_worker:
     build:
-      context: ./services/ingest
+      context: ./services/prefect_worker
       dockerfile: Dockerfile
-    container_name: ds_ingest
+    container_name: dps_prefect_worker
     environment:
       # DB
       DB_HOST: clickhouse
@@ -35,28 +33,34 @@ services:
       DB_PASSWORD: electricity
 
       # Ingestion config
-      INGEST_INTERVAL_SECONDS: "300"   # every 5 minutes
-      SOURCE_NAME: "electricity_api"
+      INGEST_INTERVAL_SECONDS: "60"   # every 1 minute
 
+      # Prefect
+      PREFECT_API_URL: http://prefect:4200/api # if this is not explicitly set and if left to depend on .env, it will try to reach Prefect on websocket port 4200 instead of http
+      PREFECT_LOGGING_EXTRA_LOGGERS: loguru
+      PREFECT_LOCAL_STORAGE_PATH: /task-storage # <---- mandatory when using .delay for background tasks
+      REQUEST_TIMEOUT: 60
+      
       # Example: if you use an external API token
       # API_TOKEN: "${API_TOKEN}"
-
-      # Metrics
-      METRICS_PORT: "8000"
       LOG_LEVEL: "INFO"
+    entrypoint: /bin/sh -c "./init.sh"
     depends_on:
       clickhouse:
         condition: service_healthy
-    ports:
-      - "8002:8000" # Prometheus metrics endpoint (host:container)
     restart: unless-stopped
     labels:
-      logging: "promtail"
+      logging: promtail
+    networks:
+      default:
+        aliases:
+          - ingest
+      microservices-network: {}
 
   # ----------- Metrics: Prometheus -----------
   prometheus:
     image: prom/prometheus:latest
-    container_name: ds_prometheus
+    container_name: dps_prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
@@ -66,23 +70,23 @@ services:
       - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - promdata:/prometheus
     depends_on:
-      - ingest
+      - prefect_worker
 
   # ----------- Logs: Loki -----------
   loki:
     image: grafana/loki:2.9.8
-    container_name: ds_loki
+    container_name: dps_loki
     command: ["-config.file=/etc/loki/config.yml"]
     ports:
-      - "3105:3100"
+      - 3105:3100
     volumes:
       - ./observability/loki/config.yml:/etc/loki/config.yml:ro
       - lokidata:/loki
 
   # ----------- Logs shipper: Promtail (reads docker logs) -----------
   promtail:
-    image: grafana/promtail:2.9.8
-    container_name: ds_promtail
+    image: grafana/promtail:latest
+    container_name: dps_promtail
     command: ["-config.file=/etc/promtail/config.yml"]
     volumes:
       - ./observability/promtail/config.yml:/etc/promtail/config.yml:ro
@@ -94,9 +98,9 @@ services:
   # ----------- Grafana (dashboards + “show data”) -----------
   grafana:
     image: grafana/grafana:latest
-    container_name: ds_grafana
+    container_name: dps_grafana
     ports:
-      - "3005:3000"
+      - 3005:3000
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
@@ -116,3 +120,7 @@ volumes:
   promdata:
   lokidata:
   grafanadata:
+
+networks:
+  microservices-network:
+    external: true

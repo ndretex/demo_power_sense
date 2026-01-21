@@ -1,7 +1,9 @@
+prefect
 requests
 clickhouse-connect
-prometheus-client
 python-dateutil
 pandas
+polars
 openpyxl
 xlrd
+pendulum
