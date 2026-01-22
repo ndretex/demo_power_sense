@@ -3,6 +3,7 @@ from typing import Optional
 
 
 def get_env(name: str, default: Optional[str] = None) -> Optional[str]:
+    """Return an environment variable value with optional default."""
     return os.getenv(name, default)
 
 
@@ -11,6 +12,9 @@ DB_PORT = int(get_env("DB_PORT", "8123"))
 DB_NAME = get_env("DB_NAME", "electricity")
 DB_USER = get_env("DB_USER", "electricity")
 DB_PASSWORD = get_env("DB_PASSWORD", "electricity")
+
+# Data API configuration
+DATA_API_URL = get_env("DATA_API_URL", "http://api_data:8000")
 
 
 # INGESTION PHASE CONFIGURATION

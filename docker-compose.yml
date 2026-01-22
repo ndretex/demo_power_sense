@@ -32,6 +32,9 @@ services:
       DB_USER: electricity
       DB_PASSWORD: electricity
 
+      # Data API
+      DATA_API_URL: http://api_data:8000
+
       # Ingestion config
       INGEST_INTERVAL_SECONDS: "60" # every 1 minute
 
@@ -48,6 +51,8 @@ services:
     depends_on:
       clickhouse:
         condition: service_healthy
+      api_data:
+        condition: service_started
     restart: unless-stopped
     labels:
       logging: promtail
@@ -55,6 +60,33 @@ services:
       default:
         aliases:
           - ingest
+      microservices-network: {}
+
+  # ----------- Data API (FastAPI) -----------
+  api_data:
+    build:
+      context: ./services/api_data
+      dockerfile: Dockerfile
+    container_name: dps_api_data
+    environment:
+      DB_HOST: clickhouse
+      DB_PORT: "8123"
+      DB_NAME: electricity
+      DB_USER: electricity
+      DB_PASSWORD: electricity
+      LOG_LEVEL: "INFO"
+    ports:
+      - "8005:8000"
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    restart: unless-stopped
+    labels:
+      logging: promtail
+    networks:
+      default:
+        aliases:
+          - api_data
       microservices-network: {}
 
   # ----------- Metrics: Prometheus -----------

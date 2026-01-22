@@ -12,6 +12,7 @@ This service runs a Prefect worker that executes project flows (ingest now, mode
 Environment variables:
 
 - DB connection: DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
+- Data API: DATA_API_URL
 - Ingestion: API_URL, HISTORY_DATA_URL, INGEST_INTERVAL_SECONDS
 - Prefect: PREFECT_API_URL, PREFECT_WORK_POOL_NAME
 
@@ -43,3 +44,7 @@ The worker in docker-compose will pick up the deployment runs from the configure
 ## Observability
 
 Logs are shipped via Promtail/Loki as before (container name is preserved for dashboards).
+
+## Data Access
+
+This worker writes and reads measurement state through the Data API service. It does not connect to ClickHouse directly.

@@ -1,20 +1,28 @@
-import json
-import math
 import time
-from datetime import timezone
-from typing import Dict, List, Optional, Tuple
+from typing import List, Tuple
 
-import clickhouse_connect
-from clickhouse_connect.driver.exceptions import ClickHouseError
+import requests
 
-from config import DB_HOST, DB_NAME, DB_PASSWORD, DB_PORT, DB_USER
+from config import DATA_API_URL
+
+
+def _build_url(path: str) -> str:
+    """Join a path to the base Data API URL."""
+    base = DATA_API_URL.rstrip("/")
+    return f"{base}/{path.lstrip('/')}"
 
 
 def _is_nullish(value) -> bool:
+    """Return True when the value should be stored as SQL NULL."""
     if value is None:
         return True
-    if isinstance(value, float) and math.isnan(value):
-        return True
+    try:
+        import math
+
+        if isinstance(value, float) and math.isnan(value):
+            return True
+    except Exception:
+        pass
     try:
         import pandas as pd
 
@@ -25,56 +33,18 @@ def _is_nullish(value) -> bool:
     return False
 
 
-def _format_ukey(ts, perimetre: str, nature, metric: str) -> str:
-    if getattr(ts, "tzinfo", None) is not None:
-        ts = ts.astimezone(timezone.utc)
-    date_str = ts.strftime("%Y%m%d")
-    time_str = ts.strftime("%H:%M:%S")
-    payload = {
-        "perimetre": perimetre,
-        "nature": nature,
-        "metric": metric,
-        "date": date_str,
-        "time": time_str,
-    }
-    return json.dumps(
-        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    )
+def _post_json(path: str, payload: dict, timeout: int = 30) -> requests.Response:
+    """Send a JSON POST request to the Data API."""
+    url = _build_url(path)
+    return requests.post(url, json=payload, timeout=timeout)
 
 
-def get_client():
-    return clickhouse_connect.get_client(
-        host=DB_HOST,
-        port=DB_PORT,
-        username=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-    )
-
-
-
-
-def _values_equal(left, right) -> bool:
-    if left is None and right is None:
-        return True
-    return left == right
-
-
-def _fetch_latest_state(
-    client, ukeys: List[str], chunk_size: int = 500
-) -> Dict[str, Tuple[Optional[float], Optional[int]]]:
-    if not ukeys:
-        return {}
-    state: Dict[str, Tuple[Optional[float], Optional[int]]] = {}
-    for i in range(0, len(ukeys), chunk_size):
-        batch = ukeys[i : i + chunk_size]
-        result = client.query(
-            "SELECT ukey, value, version FROM measurements_latest FINAL WHERE ukey IN %(ukeys)s",
-            parameters={"ukeys": batch},
-        )
-        for ukey, value, version in result.result_rows:
-            state[ukey] = (value, int(version) if version is not None else None)
-    return state
+def _get_json(path: str, timeout: int = 30) -> dict:
+    """Send a GET request to the Data API and return JSON."""
+    url = _build_url(path)
+    resp = requests.get(url, timeout=timeout)
+    resp.raise_for_status()
+    return resp.json()
 
 
 def insert_measurements(
@@ -83,7 +53,7 @@ def insert_measurements(
     max_retries: int = 5,
 ) -> int:
     """
-    Batch insert rows into measurements.
+    Batch insert rows into measurements via the Data API.
 
     rows: list of (ts, source, metric, value, perimetre, nature)
     Returns number of rows inserted/upserted.
@@ -92,43 +62,40 @@ def insert_measurements(
     if not rows:
         return 0
 
+    payload = {
+        "rows": [
+            {
+                "ts": ts.isoformat(),
+                "source": source,
+                "metric": metric,
+                "value": None if _is_nullish(value) else value,
+                "perimetre": perimetre,
+                "nature": nature,
+            }
+            for ts, source, metric, value, perimetre, nature in rows
+        ]
+    }
+
     attempts = 0
     while True:
         try:
-            client = get_client()
-
-            prepared_rows: List[Tuple] = []
-            staged: List[Tuple] = []
-            for r in rows:
-                ts, source, metric, value, perimetre, nature = r
-                clean_value = None if _is_nullish(value) else value
-                ukey_json = _format_ukey(ts, perimetre, nature, metric)
-                staged.append((ts, source, metric, clean_value, ukey_json))
-
-            ukeys = list({row[4] for row in staged})
-            latest_state = _fetch_latest_state(client, ukeys)
-
-            for ts, source, metric, clean_value, ukey_json in staged:
-                last_value, last_version = latest_state.get(ukey_json, (None, None))
-                if _values_equal(clean_value, last_value):
-                    continue
-                next_version = 1 if last_version is None else int(last_version) + 1
-                prepared_rows.append(
-                    (ts, source, metric, clean_value, ukey_json, next_version)
-                )
-                latest_state[ukey_json] = (clean_value, next_version)
-
-            if not prepared_rows:
-                return 0
-
-            client.insert(
-                "measurements",
-                prepared_rows,
-                column_names=["ts", "source", "metric", "value", "ukey", "version"],
-            )
-            return len(prepared_rows)
-        except ClickHouseError:
+            resp = _post_json("measurements/ingest", payload, timeout=60)
+            resp.raise_for_status()
+            data = resp.json()
+            return int(data.get("inserted", 0))
+        except requests.RequestException:
             attempts += 1
             if attempts >= max_retries:
                 raise
             time.sleep(retry_seconds * attempts)
+
+
+def count_measurements() -> int:
+    """Return total measurement count from the Data API."""
+    data = _get_json("measurements/count")
+    return int(data.get("count", 0))
+
+
+def is_empty() -> bool:
+    """Return True when no measurements exist."""
+    return count_measurements() == 0

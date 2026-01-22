@@ -37,12 +37,10 @@ def _build_windowed_url(base_url: str, window_days: int = 1) -> str:
 
 @task(name="DPS-check_db_empty")
 def check_db_empty() -> bool:
+    """Return True when no measurements exist via the Data API."""
     logger = get_run_logger()
     try:
-        client = db.get_client()
-        result = client.query("SELECT count() FROM measurements")
-        count = result.result_rows[0][0] if result.result_rows else 0
-        empty = count == 0
+        empty = db.is_empty()
         logger.info("db_empty=%s", empty)
         return empty
     except Exception as exc:

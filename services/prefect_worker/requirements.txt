@@ -1,6 +1,5 @@
 prefect
 requests
-clickhouse-connect
 python-dateutil
 pandas
 polars

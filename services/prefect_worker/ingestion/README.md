@@ -1,11 +1,11 @@
 # Ingestion Pipeline
 
-This folder contains the Prefect ingestion flow and tasks that load electricity data into ClickHouse.
+This folder contains the Prefect ingestion flow and tasks that load electricity data through the Data API.
 
 ## Step-by-step pipeline
 
-1. **Check ClickHouse emptiness** (`DPS-check_db_empty`)
-   - Queries the `measurements` table to determine if it is empty.
+1. **Check database emptiness** (`DPS-check_db_empty`)
+   - Calls the Data API to determine if the `measurements` table is empty.
    - Logs the `db_empty` flag.
 
 2. **Bootstrap historical data** (`DPS-bootstrap_history`, conditional)
@@ -22,9 +22,9 @@ This folder contains the Prefect ingestion flow and tasks that load electricity 
    - Converts API records into measurement rows.
    - Each numeric field becomes a measurement with timestamps and source metadata.
 
-5. **Write rows to ClickHouse** (`DPS-write_rows`)
-   - Inserts normalized rows into the `measurements` table.
-   - Retries on transient database errors.
+5. **Write rows via Data API** (`DPS-write_rows`)
+   - Inserts normalized rows through the Data API into the `measurements` table.
+   - Retries on transient API/database errors.
    - Deduplicates rows with the same `ukey` and `value` and assigns a sequential `version` per `ukey` when values change.
 
 Bootstrap normalization and inserts run sequentially to avoid parallel fan-out.

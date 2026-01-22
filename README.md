@@ -20,6 +20,7 @@ Current phase (Phase 1):
 - (Metrics disabled) Prometheus is kept for future phases.
 - Centralized logging with Loki + Promtail.
 - Grafana exploration across metrics, logs, and time‑series data.
+- Database access is centralized behind the Data API service.
 - NaN/NA/NaT values are sanitized to SQL NULL during ingestion inserts.
 - Each measurement row stores insertion time in `inserted_at` (defaults to current time).
 - Each measurement row includes a `ukey` JSON string and a sequential `version` that increments when the value for a `ukey` changes (1, 2, 3...).
@@ -30,6 +31,7 @@ Current phase (Phase 1):
 
 - **clickhouse**: ClickHouse backing store.
 - **prefect_worker**: Prefect worker running project flows (ingest now, future phases later).
+- **api_data**: FastAPI service for all ClickHouse inserts and queries.
 - **prometheus**: Reserved for future metrics.
 - **loki** + **promtail**: Collect and index logs.
 - **grafana**: Dashboards and data exploration.
@@ -56,7 +58,15 @@ Current phase (Phase 1):
     - flow.py
     - tasks.py
     - transform.py
+- services/api_data/
+  - Dockerfile
+  - requirements.txt
+  - main.py
+  - config.py
+  - db.py
+  - logging_config.py
 
 ## Service Documentation
 
 - See the Prefect worker details in services/prefect_worker/README.md.
+- See the Data API details in services/api_data/README.md.
