@@ -33,14 +33,14 @@ services:
       DB_PASSWORD: electricity
 
       # Ingestion config
-      INGEST_INTERVAL_SECONDS: "60"   # every 1 minute
+      INGEST_INTERVAL_SECONDS: "60" # every 1 minute
 
       # Prefect
       PREFECT_API_URL: http://prefect:4200/api # if this is not explicitly set and if left to depend on .env, it will try to reach Prefect on websocket port 4200 instead of http
       PREFECT_LOGGING_EXTRA_LOGGERS: loguru
       PREFECT_LOCAL_STORAGE_PATH: /task-storage # <---- mandatory when using .delay for background tasks
       REQUEST_TIMEOUT: 60
-      
+
       # Example: if you use an external API token
       # API_TOKEN: "${API_TOKEN}"
       LOG_LEVEL: "INFO"
