@@ -1,0 +1,24 @@
+name: demo_power_sense
+version: 1.0.0
+config-version: 2
+
+profile: demo_power_sense
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  demo_power_sense:
+    +materialized: view
+    staging:
+      +tags: ["staging"]
+    marts:
+      +tags: ["mart"]

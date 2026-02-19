@@ -1,0 +1,13 @@
+demo_power_sense:
+  target: dev
+  outputs:
+    dev:
+      type: clickhouse
+      host: "{{ env_var('DB_HOST', 'localhost') }}"
+      port: "{{ env_var('DB_PORT', '58123') | int }}"
+      user: "{{ env_var('DB_USER', 'electricity') }}"
+      password: "{{ env_var('DB_PASSWORD', 'electricity') }}"
+      schema: "{{ env_var('DB_NAME', 'electricity') }}"
+      secure: false
+      verify: false
+      threads: 4

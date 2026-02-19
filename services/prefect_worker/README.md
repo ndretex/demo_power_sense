@@ -1,6 +1,6 @@
 # Prefect Worker Service
 
-This service runs a Prefect worker that executes project flows (ingest now, model training/deployment/prediction later). The worker joins the external microservices-network to reach the existing Prefect API.
+This service runs a Prefect worker that executes project flows (ingest now, model training/deployment/prediction later). The worker joins the external microservices-network to reach the shared Prefect API, and stays on the default project network to reach the local Data API.
 
 ## Responsibilities
 
@@ -19,6 +19,7 @@ Environment variables:
 ## Flow Layout
 
 - ingestion (implemented)
+- anomaly_detection (baseline z-score on consommation)
 - model_training (placeholder)
 - model_deployment (placeholder)
 - prediction (placeholder)
@@ -30,6 +31,16 @@ Location: ingestion/flow.py
 The ingest flow performs a single ingestion cycle (bootstrap history if empty, fetch, normalize, insert, logs). Schedule it in Prefect to run every 5–15 minutes.
 
 At container startup, `init.sh` runs `ingestion/deployments.py` to register `ingest_cycle` on a 5‑minute interval schedule.
+
+## Flow: anomaly_detection_cycle
+
+Location: anomaly_detection/flow.py
+
+The anomaly detection flow builds a baseline by day‑of‑week and 15‑minute buckets, scores recent `consommation` values with z‑score, and writes anomaly z‑scores back into the measurements table.
+
+Anomaly records are stored in the `anomalies` table via the Data API.
+
+At container startup, `init.sh` registers `anomaly_detection_cycle` on a 15‑minute interval schedule.
 
 ## Deployment Notes
 

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+import pendulum
 from typing import Any, Dict, List, Tuple
 from urllib.parse import urlencode, urlparse, urlunparse, parse_qs
 
@@ -9,8 +9,7 @@ import zipfile
 import requests
 from prefect import get_run_logger, task
 
-import db
-from config import API_URL, HISTORY_DATA_URL
+from config import API_URL, DATA_API_URL, HISTORY_DATA_URL
 from ingestion.transform import normalize_record, remap_metric_name
 
 
@@ -27,12 +26,107 @@ def _build_windowed_url(base_url: str, window_days: int = 1) -> str:
     parsed = urlparse(base_url)
     query = parse_qs(parsed.query)
 
-    window_start = datetime.now(timezone.utc) - timedelta(days=window_days)
-    window_iso = window_start.isoformat(timespec="seconds")
+    window_start = pendulum.now("UTC").subtract(days=window_days)
+    window_iso = window_start.to_iso8601_string()
     query["where"] = [f"date_heure > '{window_iso}'"]
 
     new_query = urlencode(query, doseq=True)
     return urlunparse(parsed._replace(query=new_query))
+
+
+def _build_data_api_url(path: str) -> str:
+    """Join a path to the base Data API URL."""
+    base = DATA_API_URL.rstrip("/")
+    return f"{base}/{path.lstrip('/')}"
+
+
+def _is_nullish(value) -> bool:
+    """Return True when the value should be stored as SQL NULL."""
+    if value is None:
+        return True
+    try:
+        import math
+
+        if isinstance(value, float) and math.isnan(value):
+            return True
+    except Exception:
+        pass
+    try:
+        import pandas as pd
+
+        if value is pd.NA or value is pd.NaT:
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _post_data_api(path: str, payload: dict, timeout: int = 30) -> requests.Response:
+    """Send a JSON POST request to the Data API."""
+    url = _build_data_api_url(path)
+    return requests.post(url, json=payload, timeout=timeout)
+
+
+def _get_data_api(path: str, timeout: int = 30) -> dict:
+    """Send a GET request to the Data API and return JSON."""
+    url = _build_data_api_url(path)
+    resp = requests.get(url, timeout=timeout)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def insert_measurements(
+    rows: List[Tuple],
+    retry_seconds: int = 1,
+    max_retries: int = 5,
+) -> int:
+    """
+    Batch insert rows into measurements via the Data API.
+
+    rows: list of (ts, source, metric, value, perimetre, nature)
+    Returns number of rows inserted/upserted.
+    """
+
+    if not rows:
+        return 0
+
+    payload = {
+        "rows": [
+            {
+                "ts": ts.isoformat(),
+                "source": source,
+                "metric": metric,
+                "value": None if _is_nullish(value) else value,
+                "perimetre": perimetre,
+                "nature": nature,
+            }
+            for ts, source, metric, value, perimetre, nature in rows
+        ]
+    }
+
+    attempts = 0
+    while True:
+        try:
+            resp = _post_data_api("measurements/ingest", payload, timeout=60)
+            resp.raise_for_status()
+            data = resp.json()
+            return int(data.get("inserted", 0))
+        except requests.RequestException:
+            attempts += 1
+            if attempts >= max_retries:
+                raise
+            time.sleep(retry_seconds * attempts)
+
+
+def count_measurements() -> int:
+    """Return total measurement count from the Data API."""
+    data = _get_data_api("measurements/count")
+    return int(data.get("count", 0))
+
+
+def is_empty() -> bool:
+    """Return True when no measurements exist."""
+    return count_measurements() == 0
 
 
 @task(name="DPS-check_db_empty")
@@ -40,7 +134,7 @@ def check_db_empty() -> bool:
     """Return True when no measurements exist via the Data API."""
     logger = get_run_logger()
     try:
-        empty = db.is_empty()
+        empty = is_empty()
         logger.info("db_empty=%s", empty)
         return empty
     except Exception as exc:
@@ -94,11 +188,10 @@ def bootstrap_history() -> List[Tuple]:
                     lambda row: f"{row['date']}T{row['heure']}:00+00:00", axis=1
                 )
 
-        from datetime import datetime as dt, timedelta as td
         import pandas as pd
 
-        today = dt.now().date()
-        df = df[pd.to_datetime(df["date_heure"]).dt.date <= (today - td(days=1))]
+        cutoff_date = pendulum.now("UTC").subtract(days=1).date()
+        df = df[pd.to_datetime(df["date_heure"]).dt.date <= cutoff_date]
 
         logger.info("bootstrap history rows=%d", len(df))
 
@@ -189,5 +282,5 @@ def flatten_rows(row_lists: List[List[Tuple]]) -> List[Tuple]:
 def write_rows(rows: List[Tuple]) -> int:
     if not rows:
         return 0
-    n = db.insert_measurements(rows)
+    n = insert_measurements(rows)
     return n

@@ -21,20 +21,27 @@ Current phase (Phase 1):
 - Centralized logging with Loki + Promtail.
 - Grafana exploration across metrics, logs, and time‑series data.
 - Database access is centralized behind the Data API service.
+- Baseline z‑score anomaly detection on 15‑minute consommation data stored in a dedicated anomalies table.
 - NaN/NA/NaT values are sanitized to SQL NULL during ingestion inserts.
 - Each measurement row stores insertion time in `inserted_at` (defaults to current time).
 - Each measurement row includes a `ukey` JSON string and a sequential `version` that increments when the value for a `ukey` changes (1, 2, 3...).
 - The `measurements` table deduplicates on (`ukey`, `version`) and keeps the latest `inserted_at` during merges.
-- A materialized view (`measurements_latest`) keeps the latest inserted row per `ukey`.
+- dbt models build derived analytics relations, including `measurements_latest` and daily ingestion coverage checks.
 
 ## Services (Docker Compose)
 
 - **clickhouse**: ClickHouse backing store.
 - **prefect_worker**: Prefect worker running project flows (ingest now, future phases later).
 - **api_data**: FastAPI service for all ClickHouse inserts and queries.
+- **dbt**: Builds and tests derived models in ClickHouse.
 - **prometheus**: Reserved for future metrics.
 - **loki** + **promtail**: Collect and index logs.
 - **grafana**: Dashboards and data exploration.
+
+## Networking
+
+- The `prefect_worker` joins the external `microservices-network` to reach the shared Prefect API.
+- The `api_data` service is isolated to the project default network to avoid cross-project traffic on `microservices-network`.
 
 ## Repository Structure
 
@@ -42,6 +49,11 @@ Current phase (Phase 1):
 - ch/init/001.database.sql
 - ch/init/002.tables.sql
 - ch/init/003.views.sql
+- dbt/
+  - dbt_project.yml
+  - profiles.yml
+  - models/staging/
+  - models/marts/
 - observability/
   - grafana/provisioning/datasources/datasources.yml
   - prometheus/prometheus.yml
@@ -54,6 +66,7 @@ Current phase (Phase 1):
   - config.py
   - db.py
   - logging_config.py
+  - anomaly_detection/
   - ingestion/
     - flow.py
     - tasks.py
@@ -70,3 +83,4 @@ Current phase (Phase 1):
 
 - See the Prefect worker details in services/prefect_worker/README.md.
 - See the Data API details in services/api_data/README.md.
+- See dbt usage in docs/dbt_setup.md.

@@ -1,0 +1,28 @@
+version: 2
+
+sources:
+  - name: electricity_raw
+    schema: "{{ env_var('DB_NAME', 'electricity') }}"
+    tables:
+      - name: measurements
+        description: Raw time-series measurements loaded by ingestion jobs.
+
+models:
+  - name: stg_electricity__measurements
+    description: Staging model exposing raw electricity measurements for downstream marts.
+    columns:
+      - name: ts
+        tests:
+          - not_null: {}
+      - name: source
+        tests:
+          - not_null: {}
+      - name: metric
+        tests:
+          - not_null: {}
+      - name: ukey
+        tests:
+          - not_null: {}
+      - name: version
+        tests:
+          - not_null: {}

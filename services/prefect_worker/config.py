@@ -36,3 +36,15 @@ DEFAULT_SOURCE = get_env("SOURCE_NAME", get_env("DEFAULT_SOURCE", "France"))
 # Prefect worker configuration
 PREFECT_API_URL = get_env("PREFECT_API_URL")
 PREFECT_WORK_POOL_NAME = get_env("PREFECT_WORK_POOL_NAME", "default")
+
+
+# ANOMALY DETECTION CONFIGURATION
+ANOMALY_METRIC = get_env("ANOMALY_METRIC", "consommation")
+ANOMALY_LOOKBACK_DAYS = int(get_env("ANOMALY_LOOKBACK_DAYS", "84"))
+ANOMALY_EVAL_HOURS = int(get_env("ANOMALY_EVAL_HOURS", "24"))
+ANOMALY_Z_THRESHOLD = float(get_env("ANOMALY_Z_THRESHOLD", "3.0"))
+ANOMALY_MIN_SAMPLES = int(get_env("ANOMALY_MIN_SAMPLES", "20"))
+ANOMALY_RESULT_METRIC = get_env(
+    "ANOMALY_RESULT_METRIC", "consommation_anomaly_zscore"
+)
+ANOMALY_NATURE = get_env("ANOMALY_NATURE", "anomaly_detection")

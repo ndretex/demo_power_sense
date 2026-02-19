@@ -8,15 +8,33 @@ services:
       CLICKHOUSE_USER: electricity
       CLICKHOUSE_PASSWORD: electricity
     ports:
-      - "58123:8123"
+      - "${DPS_CLICKHOUSE_HOST_PORT}:${DPS_CLICKHOUSE_CONTAINER_PORT}"
     volumes:
       - chdata:/var/lib/clickhouse
       - ./ch/init:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8123/ping | grep -q Ok"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:${DPS_CLICKHOUSE_CONTAINER_PORT}/ping | grep -q Ok"]
       interval: 10s
       timeout: 5s
       retries: 10
+
+  # ----------- dbt (derived models) -----------
+  dbt:
+    build:
+      context: ./dbt
+      dockerfile: Dockerfile
+    container_name: dps_dbt
+    environment:
+      DB_HOST: clickhouse
+      DB_PORT: "${DPS_CLICKHOUSE_CONTAINER_PORT}"
+      DB_NAME: electricity
+      DB_USER: electricity
+      DB_PASSWORD: electricity
+    command: ["build"]
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    restart: "no"
 
   # ----------- Prefect worker (runs project flows) -----------
   prefect_worker:
@@ -27,19 +45,19 @@ services:
     environment:
       # DB
       DB_HOST: clickhouse
-      DB_PORT: "8123"
+      DB_PORT: "${DPS_CLICKHOUSE_CONTAINER_PORT}"
       DB_NAME: electricity
       DB_USER: electricity
       DB_PASSWORD: electricity
 
       # Data API
-      DATA_API_URL: http://api_data:8000
+      DATA_API_URL: http://api_data:${DPS_API_CONTAINER_PORT}
 
       # Ingestion config
       INGEST_INTERVAL_SECONDS: "60" # every 1 minute
 
       # Prefect
-      PREFECT_API_URL: http://prefect:4200/api # if this is not explicitly set and if left to depend on .env, it will try to reach Prefect on websocket port 4200 instead of http
+      PREFECT_API_URL: http://prefect:${DPS_PREFECT_API_PORT}/api # if this is not explicitly set and if left to depend on .env, it will try to reach Prefect on websocket port 4200 instead of http
       PREFECT_LOGGING_EXTRA_LOGGERS: loguru
       PREFECT_LOCAL_STORAGE_PATH: /task-storage # <---- mandatory when using .delay for background tasks
       REQUEST_TIMEOUT: 60
@@ -70,16 +88,18 @@ services:
     container_name: dps_api_data
     environment:
       DB_HOST: clickhouse
-      DB_PORT: "8123"
+      DB_PORT: "${DPS_CLICKHOUSE_CONTAINER_PORT}"
       DB_NAME: electricity
       DB_USER: electricity
       DB_PASSWORD: electricity
       LOG_LEVEL: "INFO"
     ports:
-      - "8005:8000"
+      - "${DPS_API_HOST_PORT}:${DPS_API_CONTAINER_PORT}"
     depends_on:
       clickhouse:
         condition: service_healthy
+      dbt:
+        condition: service_completed_successfully
     restart: unless-stopped
     labels:
       logging: promtail
@@ -97,7 +117,7 @@ services:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
     ports:
-      - "9095:9090"
+      - "${DPS_PROMETHEUS_HOST_PORT}:${DPS_PROMETHEUS_CONTAINER_PORT}"
     volumes:
       - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - promdata:/prometheus
@@ -110,7 +130,7 @@ services:
     container_name: dps_loki
     command: ["-config.file=/etc/loki/config.yml"]
     ports:
-      - 3105:3100
+      - "${DPS_LOKI_HOST_PORT}:${DPS_LOKI_CONTAINER_PORT}"
     volumes:
       - ./observability/loki/config.yml:/etc/loki/config.yml:ro
       - lokidata:/loki
@@ -132,7 +152,7 @@ services:
     image: grafana/grafana:latest
     container_name: dps_grafana
     ports:
-      - 3005:3000
+      - "${DPS_GRAFANA_HOST_PORT}:${DPS_GRAFANA_CONTAINER_PORT}"
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin

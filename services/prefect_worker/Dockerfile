@@ -8,6 +8,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY *.py ./
 COPY init.sh ./
 COPY ingestion/ ./ingestion/
+COPY anomaly_detection/ ./anomaly_detection/
 COPY model_training/ ./model_training/
 COPY model_deployment/ ./model_deployment/
 COPY prediction/ ./prediction/

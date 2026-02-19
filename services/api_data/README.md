@@ -22,6 +22,8 @@ Environment variables:
 - GET /measurements
 - GET /measurements/latest
 - GET /measurements/count
+- POST /anomalies/ingest
+- GET /anomalies
 
 ## Example Requests
 
@@ -34,3 +36,10 @@ Environment variables:
 
 - Latest rows
   - GET /measurements/latest?limit=100
+
+- Insert anomalies
+  - POST /anomalies/ingest
+  - Body: {"rows": [{"ts": "2024-01-01T00:00:00Z", "source": "France", "metric": "consommation", "value": 123.4, "zscore": 3.2, "mean": 100.0, "std": 7.3, "threshold": 3.0, "dow": 0, "hour": 0, "minute": 0}]}
+
+- Fetch anomalies
+  - GET /anomalies?metric=consommation&limit=100

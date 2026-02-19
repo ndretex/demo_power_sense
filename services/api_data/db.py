@@ -78,7 +78,7 @@ def _fetch_latest_state(
     for i in range(0, len(ukeys), chunk_size):
         batch = ukeys[i : i + chunk_size]
         result = client.query(
-            "SELECT ukey, value, version FROM measurements_latest FINAL WHERE ukey IN %(ukeys)s",
+            "SELECT ukey, value, version FROM measurements_latest WHERE ukey IN %(ukeys)s",
             parameters={"ukeys": batch},
         )
         for ukey, value, version in result.result_rows:
@@ -222,7 +222,7 @@ def fetch_latest_measurements(
 
     query = (
         "SELECT ts, source, metric, value, ukey, version, inserted_at "
-        "FROM measurements_latest FINAL "
+        "FROM measurements_latest "
         f"{where_sql} "
         f"ORDER BY ts {order_sql} "
         "LIMIT %(limit)s"
@@ -239,6 +239,154 @@ def fetch_latest_measurements(
                 "value": value,
                 "ukey": ukey_val,
                 "version": int(version),
+                "inserted_at": _ensure_utc(inserted_at).isoformat(),
+            }
+        )
+    return rows
+
+
+def insert_anomalies(
+    rows: List[Tuple],
+    retry_seconds: int = 1,
+    max_retries: int = 5,
+) -> int:
+    """
+    Batch insert rows into anomalies.
+
+    rows: list of (ts, source, metric, value, zscore, mean, std, threshold, dow, hour, minute)
+    Returns number of rows inserted.
+    """
+
+    if not rows:
+        return 0
+
+    attempts = 0
+    while True:
+        try:
+            client = get_client()
+            prepared_rows: List[Tuple] = []
+            for (
+                ts,
+                source,
+                metric,
+                value,
+                zscore,
+                mean,
+                std,
+                threshold,
+                dow,
+                hour,
+                minute,
+            ) in rows:
+                clean_value = None if _is_nullish(value) else value
+                prepared_rows.append(
+                    (
+                        _ensure_utc(ts),
+                        source,
+                        metric,
+                        clean_value,
+                        float(zscore),
+                        float(mean),
+                        float(std),
+                        float(threshold),
+                        int(dow),
+                        int(hour),
+                        int(minute),
+                    )
+                )
+
+            client.insert(
+                "anomalies",
+                prepared_rows,
+                column_names=[
+                    "ts",
+                    "source",
+                    "metric",
+                    "value",
+                    "zscore",
+                    "mean",
+                    "std",
+                    "threshold",
+                    "dow",
+                    "hour",
+                    "minute",
+                ],
+            )
+            return len(prepared_rows)
+        except ClickHouseError:
+            attempts += 1
+            if attempts >= max_retries:
+                raise
+            time.sleep(retry_seconds * attempts)
+
+
+def fetch_anomalies(
+    start_ts: Optional[datetime] = None,
+    end_ts: Optional[datetime] = None,
+    source: Optional[str] = None,
+    metric: Optional[str] = None,
+    limit: int = 100,
+    order: str = "desc",
+) -> List[Dict[str, Optional[str]]]:
+    """Fetch anomalies with optional filters."""
+    client = get_client()
+
+    clauses: List[str] = []
+    params: Dict[str, object] = {"limit": limit}
+
+    if start_ts:
+        clauses.append("ts >= %(start_ts)s")
+        params["start_ts"] = _ensure_utc(start_ts)
+    if end_ts:
+        clauses.append("ts <= %(end_ts)s")
+        params["end_ts"] = _ensure_utc(end_ts)
+    if source:
+        clauses.append("source = %(source)s")
+        params["source"] = source
+    if metric:
+        clauses.append("metric = %(metric)s")
+        params["metric"] = metric
+
+    where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    order_sql = "DESC" if order.lower() == "desc" else "ASC"
+
+    query = (
+        "SELECT ts, source, metric, value, zscore, mean, std, threshold, dow, hour, minute, inserted_at "
+        "FROM anomalies "
+        f"{where_sql} "
+        f"ORDER BY ts {order_sql} "
+        "LIMIT %(limit)s"
+    )
+
+    result = client.query(query, parameters=params)
+    rows: List[Dict[str, Optional[str]]] = []
+    for (
+        ts,
+        source_val,
+        metric_val,
+        value,
+        zscore,
+        mean,
+        std,
+        threshold,
+        dow,
+        hour,
+        minute,
+        inserted_at,
+    ) in result.result_rows:
+        rows.append(
+            {
+                "ts": _ensure_utc(ts).isoformat(),
+                "source": source_val,
+                "metric": metric_val,
+                "value": value,
+                "zscore": float(zscore),
+                "mean": float(mean),
+                "std": float(std),
+                "threshold": float(threshold),
+                "dow": int(dow),
+                "hour": int(hour),
+                "minute": int(minute),
                 "inserted_at": _ensure_utc(inserted_at).isoformat(),
             }
         )

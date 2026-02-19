@@ -1,5 +1,68 @@
-.github/*
+.gitignore for demo_power_sense
+
+# === Python ===
+*.py[cod]
+*.pyo
+*.pyd
+__pycache__/
 *.pyc
 
+# === Virtual Environments ===
+.venv/
+venv/
+env/
+ENV/
+*/.venv/
 
+# === Distribution / Packaging ===
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# === Testing / Coverage ===
+.tox/
+.nox/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# === IDEs / Editors ===
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# === Operating System Files ===
+.DS_Store
+Thumbs.db
+
+# === Logs ===
+logs/
+*.log
+dbt/logs/
+
+# === Docker / Local env overrides ===
+docker-compose.override.yml
+.env
+.env.*
+
+# === dbt artifacts ===
+dbt/target/
+dbt/dbt_packages/
+
+# === ClickHouse / Local Data ===
 ch/data/
+
+# === Prefect / Local runtime artifacts ===
+.prefect/
+
+# === Secrets / Keys ===
+secrets/
+*.pem
+*.key
+
+# === Misc ===
+*.sqlite3
