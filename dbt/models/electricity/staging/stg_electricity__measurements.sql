@@ -7,3 +7,4 @@ select
   version,
   inserted_at
 from {{ source('electricity_raw', 'measurements') }}
+

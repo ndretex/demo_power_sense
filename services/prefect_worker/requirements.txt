@@ -1,4 +1,4 @@
-prefect
+prefect==3.6.2
 requests
 python-dateutil
 pandas

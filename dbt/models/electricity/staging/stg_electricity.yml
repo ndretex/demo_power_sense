@@ -12,17 +12,26 @@ models:
     description: Staging model exposing raw electricity measurements for downstream marts.
     columns:
       - name: ts
+        description: Timestamp of the measurement.
         tests:
           - not_null: {}
       - name: source
+        description: Source system or domain emitting the measurement.
         tests:
           - not_null: {}
       - name: metric
+        description: Metric name associated with the measurement.
         tests:
           - not_null: {}
+      - name: value
+        description: Numeric value of the measurement.
       - name: ukey
+        description: Deterministic business key for deduplication.
         tests:
           - not_null: {}
       - name: version
+        description: Record version used to identify the most recent value.
         tests:
           - not_null: {}
+      - name: inserted_at
+        description: Warehouse ingestion timestamp for the raw record.

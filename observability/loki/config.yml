@@ -25,4 +25,4 @@ schema_config:
         period: 24h
 
 ruler:
-  alertmanager_url: http://prometheus:9093
+  alertmanager_url: http://demo_power_sense_prometheus:9093

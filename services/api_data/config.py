@@ -7,7 +7,7 @@ def get_env(name: str, default: Optional[str] = None) -> Optional[str]:
     return os.getenv(name, default)
 
 
-DB_HOST = get_env("DB_HOST", "clickhouse")
+DB_HOST = get_env("DB_HOST", "demo_power_sense_clickhouse")
 DB_PORT = int(get_env("DB_PORT", "8123"))
 DB_NAME = get_env("DB_NAME", "electricity")
 DB_USER = get_env("DB_USER", "electricity")

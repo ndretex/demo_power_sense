@@ -30,18 +30,19 @@ Current phase (Phase 1):
 
 ## Services (Docker Compose)
 
-- **clickhouse**: ClickHouse backing store.
-- **prefect_worker**: Prefect worker running project flows (ingest now, future phases later).
-- **api_data**: FastAPI service for all ClickHouse inserts and queries.
-- **dbt**: Builds and tests derived models in ClickHouse.
-- **prometheus**: Reserved for future metrics.
-- **loki** + **promtail**: Collect and index logs.
-- **grafana**: Dashboards and data exploration.
+- **demo_power_sense_clickhouse**: ClickHouse backing store.
+- **demo_power_sense_prefect_worker**: Prefect worker running project flows (ingest now, future phases later).
+- **demo_power_sense_api_data**: FastAPI service for all ClickHouse inserts and queries.
+- **demo_power_sense_dbt**: Builds and tests derived models in ClickHouse.
+- **demo_power_sense_prometheus**: Reserved for future metrics.
+- **demo_power_sense_loki** + **demo_power_sense_promtail**: Collect and index logs.
+- **demo_power_sense_grafana**: Dashboards and data exploration.
 
 ## Networking
 
-- The `prefect_worker` joins the external `microservices-network` to reach the shared Prefect API.
-- The `api_data` service is isolated to the project default network to avoid cross-project traffic on `microservices-network`.
+- The `demo_power_sense_prefect_worker` service joins the external `microservices-network` to reach the shared Prefect API.
+- The `demo_power_sense_api_data` service is isolated to the project default network to avoid cross-project traffic on `microservices-network`.
+- Container names, service hostnames, and locally built image tags use the `demo_power_sense_*` / `demo_power_sense/*` convention to avoid collisions with other projects on shared Docker networks.
 
 ## Repository Structure
 

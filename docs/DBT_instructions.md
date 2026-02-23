@@ -12,9 +12,14 @@ Use this document as the default operating guide for AI/code assistants working 
 - Keep model naming consistent:
   - Staging: `stg_<source>__<entity>`
   - Marts: `fct_<entity>`, `dim_<entity>`
+- Keep YAML property files aligned to project structure:
+  - Naming: `<level>_<schema>.yml`
+  - Examples: `stg_electricity.yml`, `int_electricity.yml`, `mrt_electricity.yml`
+- Keep YAML style clean and minimal:
+  - Avoid redundant quoting for plain string values (for example, prefer `description: Daily coverage` over quoted variants when not required).
 - Keep SQL style consistent with existing project files:
   - lowercase SQL keywords
-  - clear aliasing (`id as order_id`)
+  - clear aliasing (ex: `id as order_id`)
   - explicit `source()` / `ref()` usage
 - In staging models, prefer light cleanup + renaming + type normalization only.
 - In mart models, implement business logic and metrics.
@@ -34,10 +39,8 @@ Use this document as the default operating guide for AI/code assistants working 
   - `relationships`
   - `accepted_values`
 - Use singular tests in `tests/` for multi-row business assertions.
-- This project has `require_generic_test_arguments_property: true` enabled.
-  - Always put generic test args under `arguments:`.
-  - Example:
-    - `relationships: { arguments: { to: ref('...'), field: ... } }`
+- Use generic test argument syntax supported by the active dbt adapter/runtime.
+  - In this project, use the direct style for built-in tests (for example `accepted_values: { values: [...] }`).
 
 ## dbt Fusion Best Practices
 - Prefer deterministic, explicit SQL and Jinja.

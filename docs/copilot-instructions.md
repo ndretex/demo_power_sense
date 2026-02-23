@@ -16,7 +16,7 @@ You are working in an on‑prem, open‑source electricity forecasting + anomaly
 ## Primary Goals
 
 - Keep the ingestion service simple, reliable, and observable.
-- Route all ClickHouse access through the api_data service.
+- Route all ClickHouse access through the demo_power_sense_api_data service.
 - Preserve the existing Docker Compose and observability configurations.
 - Ensure Grafana can query ClickHouse, Prometheus, and Loki without changes to provisioning unless requested.
 
@@ -63,7 +63,7 @@ At the end of your work, seek confirmation that the changes meet requirements an
 - This is a multi‑phase project (ingestion → features → forecasting → anomaly detection → production deployment → monitoring). We are currently in Phase 1 (ingestion + observability).
 - Ingestion flows currently do not expose Prometheus metrics (Prefect worker metrics disabled).
 - all Prefect flows and tasks must have a prefix 'DPS-' in their names.
-- ClickHouse runs as the `clickhouse` service in docker-compose.yml.
+- ClickHouse runs as the `demo_power_sense_clickhouse` service in docker-compose.yml.
 - Grafana has pre‑provisioned datasources (Prometheus, ClickHouse, Loki).
 - Logs flow through Promtail to Loki (no extra sidecar).
 - Ingestion flows live under services/prefect_worker/ingestion.

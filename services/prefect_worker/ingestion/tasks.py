@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Tuple
 from urllib.parse import urlencode, urlparse, urlunparse, parse_qs
 
 import io
+import time
 import urllib.request
 import zipfile
 
@@ -79,6 +80,7 @@ def insert_measurements(
     rows: List[Tuple],
     retry_seconds: int = 1,
     max_retries: int = 5,
+    batch_size: int = 1000,
 ) -> int:
     """
     Batch insert rows into measurements via the Data API.
@@ -90,32 +92,41 @@ def insert_measurements(
     if not rows:
         return 0
 
-    payload = {
-        "rows": [
-            {
-                "ts": ts.isoformat(),
-                "source": source,
-                "metric": metric,
-                "value": None if _is_nullish(value) else value,
-                "perimetre": perimetre,
-                "nature": nature,
-            }
-            for ts, source, metric, value, perimetre, nature in rows
-        ]
-    }
+    if batch_size <= 0:
+        batch_size = len(rows)
 
-    attempts = 0
-    while True:
-        try:
-            resp = _post_data_api("measurements/ingest", payload, timeout=60)
-            resp.raise_for_status()
-            data = resp.json()
-            return int(data.get("inserted", 0))
-        except requests.RequestException:
-            attempts += 1
-            if attempts >= max_retries:
-                raise
-            time.sleep(retry_seconds * attempts)
+    total_inserted = 0
+    for i in range(0, len(rows), batch_size):
+        chunk = rows[i : i + batch_size]
+        payload = {
+            "rows": [
+                {
+                    "ts": ts.isoformat(),
+                    "source": source,
+                    "metric": metric,
+                    "value": None if _is_nullish(value) else value,
+                    "perimetre": perimetre,
+                    "nature": nature,
+                }
+                for ts, source, metric, value, perimetre, nature in chunk
+            ]
+        }
+
+        attempts = 0
+        while True:
+            try:
+                resp = _post_data_api("measurements/ingest", payload, timeout=60)
+                resp.raise_for_status()
+                data = resp.json()
+                total_inserted += int(data.get("inserted", 0))
+                break
+            except requests.RequestException:
+                attempts += 1
+                if attempts >= max_retries:
+                    raise
+                time.sleep(retry_seconds * attempts)
+
+    return total_inserted
 
 
 def count_measurements() -> int:
@@ -282,5 +293,9 @@ def flatten_rows(row_lists: List[List[Tuple]]) -> List[Tuple]:
 def write_rows(rows: List[Tuple]) -> int:
     if not rows:
         return 0
-    n = insert_measurements(rows)
+    logger = get_run_logger()
+    batch_size = 1000
+    logger.info("writing rows in batches total=%d batch_size=%d", len(rows), batch_size)
+    n = insert_measurements(rows, batch_size=batch_size)
+    logger.info("rows written=%d", n)
     return n

@@ -2,7 +2,7 @@ with bounds as (
   select
     ifNull(min(toDate(ts)), today()) as min_day,
     greatest(ifNull(max(toDate(ts)), today()), today()) as max_day
-  from {{ ref('stg_electricity__measurements') }}
+  from {{ ref('int_electricity__measurements_latest') }}
 ),
 date_spine as (
   select
@@ -14,7 +14,7 @@ source_metric as (
   select distinct
     source,
     metric
-  from {{ ref('stg_electricity__measurements') }}
+  from {{ ref('int_electricity__measurements_latest') }}
 ),
 expected_days as (
   select
@@ -32,7 +32,7 @@ actual_daily as (
     count() as rows_ingested,
     min(inserted_at) as first_ingested_at,
     max(inserted_at) as last_ingested_at
-  from {{ ref('stg_electricity__measurements') }}
+  from {{ ref('int_electricity__measurements_latest') }}
   group by data_day, source, metric
 )
 select

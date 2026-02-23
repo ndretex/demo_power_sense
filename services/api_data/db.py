@@ -78,7 +78,7 @@ def _fetch_latest_state(
     for i in range(0, len(ukeys), chunk_size):
         batch = ukeys[i : i + chunk_size]
         result = client.query(
-            "SELECT ukey, value, version FROM measurements_latest WHERE ukey IN %(ukeys)s",
+            "SELECT ukey, value, version FROM int_electricity__measurements_latest WHERE ukey IN %(ukeys)s",
             parameters={"ukeys": batch},
         )
         for ukey, value, version in result.result_rows:
@@ -222,7 +222,7 @@ def fetch_latest_measurements(
 
     query = (
         "SELECT ts, source, metric, value, ukey, version, inserted_at "
-        "FROM measurements_latest "
+        "FROM int_electricity__measurements_latest "
         f"{where_sql} "
         f"ORDER BY ts {order_sql} "
         "LIMIT %(limit)s"

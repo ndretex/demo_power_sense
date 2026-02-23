@@ -1,8 +1,8 @@
 services:
   # ----------- Storage (ClickHouse) -----------
-  clickhouse:
+  demo_power_sense_clickhouse:
     image: clickhouse/clickhouse-server:latest
-    container_name: dps_clickhouse
+    container_name: demo_power_sense_clickhouse
     environment:
       CLICKHOUSE_DB: electricity
       CLICKHOUSE_USER: electricity
@@ -19,39 +19,41 @@ services:
       retries: 10
 
   # ----------- dbt (derived models) -----------
-  dbt:
+  demo_power_sense_dbt:
+    image: demo_power_sense/dbt:local
     build:
       context: ./dbt
       dockerfile: Dockerfile
-    container_name: dps_dbt
+    container_name: demo_power_sense_dbt
     environment:
-      DB_HOST: clickhouse
+      DB_HOST: demo_power_sense_clickhouse
       DB_PORT: "${DPS_CLICKHOUSE_CONTAINER_PORT}"
       DB_NAME: electricity
       DB_USER: electricity
       DB_PASSWORD: electricity
     command: ["build"]
     depends_on:
-      clickhouse:
+      demo_power_sense_clickhouse:
         condition: service_healthy
     restart: "no"
 
   # ----------- Prefect worker (runs project flows) -----------
-  prefect_worker:
+  demo_power_sense_prefect_worker:
+    image: demo_power_sense/prefect_worker:local
     build:
       context: ./services/prefect_worker
       dockerfile: Dockerfile
-    container_name: dps_prefect_worker
+    container_name: demo_power_sense_prefect_worker
     environment:
       # DB
-      DB_HOST: clickhouse
+      DB_HOST: demo_power_sense_clickhouse
       DB_PORT: "${DPS_CLICKHOUSE_CONTAINER_PORT}"
       DB_NAME: electricity
       DB_USER: electricity
       DB_PASSWORD: electricity
 
       # Data API
-      DATA_API_URL: http://api_data:${DPS_API_CONTAINER_PORT}
+      DATA_API_URL: http://demo_power_sense_api_data:${DPS_API_CONTAINER_PORT}
 
       # Ingestion config
       INGEST_INTERVAL_SECONDS: "60" # every 1 minute
@@ -67,27 +69,26 @@ services:
       LOG_LEVEL: "INFO"
     entrypoint: /bin/sh -c "./init.sh"
     depends_on:
-      clickhouse:
+      demo_power_sense_clickhouse:
         condition: service_healthy
-      api_data:
+      demo_power_sense_api_data:
         condition: service_started
     restart: unless-stopped
     labels:
       logging: promtail
     networks:
-      default:
-        aliases:
-          - ingest
+      default: {}
       microservices-network: {}
 
   # ----------- Data API (FastAPI) -----------
-  api_data:
+  demo_power_sense_api_data:
+    image: demo_power_sense/api_data:local
     build:
       context: ./services/api_data
       dockerfile: Dockerfile
-    container_name: dps_api_data
+    container_name: demo_power_sense_api_data
     environment:
-      DB_HOST: clickhouse
+      DB_HOST: demo_power_sense_clickhouse
       DB_PORT: "${DPS_CLICKHOUSE_CONTAINER_PORT}"
       DB_NAME: electricity
       DB_USER: electricity
@@ -96,23 +97,20 @@ services:
     ports:
       - "${DPS_API_HOST_PORT}:${DPS_API_CONTAINER_PORT}"
     depends_on:
-      clickhouse:
+      demo_power_sense_clickhouse:
         condition: service_healthy
-      dbt:
+      demo_power_sense_dbt:
         condition: service_completed_successfully
     restart: unless-stopped
     labels:
       logging: promtail
     networks:
-      default:
-        aliases:
-          - api_data
-      microservices-network: {}
+      default: {}
 
   # ----------- Metrics: Prometheus -----------
-  prometheus:
+  demo_power_sense_prometheus:
     image: prom/prometheus:latest
-    container_name: dps_prometheus
+    container_name: demo_power_sense_prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
@@ -122,12 +120,12 @@ services:
       - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - promdata:/prometheus
     depends_on:
-      - prefect_worker
+      - demo_power_sense_prefect_worker
 
   # ----------- Logs: Loki -----------
-  loki:
+  demo_power_sense_loki:
     image: grafana/loki:2.9.8
-    container_name: dps_loki
+    container_name: demo_power_sense_loki
     command: ["-config.file=/etc/loki/config.yml"]
     ports:
       - "${DPS_LOKI_HOST_PORT}:${DPS_LOKI_CONTAINER_PORT}"
@@ -136,21 +134,21 @@ services:
       - lokidata:/loki
 
   # ----------- Logs shipper: Promtail (reads docker logs) -----------
-  promtail:
+  demo_power_sense_promtail:
     image: grafana/promtail:latest
-    container_name: dps_promtail
+    container_name: demo_power_sense_promtail
     command: ["-config.file=/etc/promtail/config.yml"]
     volumes:
       - ./observability/promtail/config.yml:/etc/promtail/config.yml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
     depends_on:
-      - loki
+      - demo_power_sense_loki
 
   # ----------- Grafana (dashboards + “show data”) -----------
-  grafana:
+  demo_power_sense_grafana:
     image: grafana/grafana:latest
-    container_name: dps_grafana
+    container_name: demo_power_sense_grafana
     ports:
       - "${DPS_GRAFANA_HOST_PORT}:${DPS_GRAFANA_CONTAINER_PORT}"
     environment:
@@ -163,9 +161,9 @@ services:
       - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
-      - prometheus
-      - clickhouse
-      - loki
+      - demo_power_sense_prometheus
+      - demo_power_sense_clickhouse
+      - demo_power_sense_loki
 
 volumes:
   chdata:

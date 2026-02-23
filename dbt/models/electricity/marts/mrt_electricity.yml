@@ -1,0 +1,36 @@
+version: 2
+
+models:
+  - name: fct_ingestion_daily_coverage
+    description: Daily ingestion coverage by source and metric built from the intermediate latest-measurements model.
+    columns:
+      - name: data_day
+        description: Calendar day for expected ingestion coverage.
+        tests:
+          - not_null: {}
+      - name: source
+        description: Measurement source.
+        tests:
+          - not_null: {}
+      - name: metric
+        description: Measurement metric.
+        tests:
+          - not_null: {}
+      - name: rows_ingested
+        description: Number of rows ingested for the day/source/metric.
+        tests:
+          - not_null: {}
+      - name: first_ingested_at
+        description: Earliest ingestion timestamp seen for the day/source/metric.
+      - name: last_ingested_at
+        description: Latest ingestion timestamp seen for the day/source/metric.
+      - name: has_data
+        description: Flag indicating whether at least one row exists for the day/source/metric.
+        tests:
+          - accepted_values:
+              values: [0, 1]
+      - name: is_missing_day
+        description: Flag indicating whether ingestion is missing for the day/source/metric.
+        tests:
+          - accepted_values:
+              values: [0, 1]
